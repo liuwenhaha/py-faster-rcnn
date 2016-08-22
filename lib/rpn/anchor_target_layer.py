@@ -276,6 +276,9 @@ def _compute_targets(ex_rois, gt_rois):
 
     assert ex_rois.shape[0] == gt_rois.shape[0]
     assert ex_rois.shape[1] == 4
-    assert gt_rois.shape[1] == 5
+    if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+        assert gt_rois.shape[1] == 9
+    else:
+        assert gt_rois.shape[1] == 5
 
     return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
