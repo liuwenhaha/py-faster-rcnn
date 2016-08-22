@@ -35,6 +35,9 @@ class ProposalTargetLayer(caffe.Layer):
         top[3].reshape(1, self._num_classes * 4)
         # bbox_outside_weights
         top[4].reshape(1, self._num_classes * 4)
+        if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+            # key_targets
+            top[5].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
@@ -67,7 +70,12 @@ class ProposalTargetLayer(caffe.Layer):
 
         # Sample rois with classification labels and bounding box regression
         # targets
-        labels, rois, bbox_targets, bbox_inside_weights = _sample_rois(
+        if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+            labels, rois, bbox_targets, bbox_inside_weights, key_targets = _sample_rois(
+            all_rois, gt_boxes, fg_rois_per_image,
+            rois_per_image, self._num_classes)
+        else:   
+            labels, rois, bbox_targets, bbox_inside_weights = _sample_rois(
             all_rois, gt_boxes, fg_rois_per_image,
             rois_per_image, self._num_classes)
 
@@ -101,6 +109,10 @@ class ProposalTargetLayer(caffe.Layer):
         top[4].reshape(*bbox_inside_weights.shape)
         top[4].data[...] = np.array(bbox_inside_weights > 0).astype(np.float32)
 
+        if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+            top[5].reshape(*key_targets.shape)
+            top[5].data[...] = key_targets
+
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""
         pass
@@ -110,7 +122,7 @@ class ProposalTargetLayer(caffe.Layer):
         pass
 
 
-def _get_bbox_regression_labels(bbox_target_data, num_classes):
+def _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data=None):
     """Bounding-box regression targets (bbox_target_data) are stored in a
     compact form N x (class, tx, ty, tw, th)
 
@@ -126,13 +138,24 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
     bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
     bbox_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
     inds = np.where(clss > 0)[0]
-    for ind in inds:
-        cls = clss[ind]
-        start = 4 * cls
-        end = start + 4
-        bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
-        bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
-    return bbox_targets, bbox_inside_weights
+    if key_target_data is None:
+        for ind in inds:
+            cls = clss[ind]
+            start = 4 * cls
+            end = start + 4
+            bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
+            bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
+        return bbox_targets, bbox_inside_weights
+    else:
+        key_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
+        for ind in inds:
+            cls = clss[ind]
+            start = 4 * cls
+            end = start + 4
+            bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
+            key_targets[ind, start:end] = key_target_data[ind, 1:]
+            bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
+        return bbox_targets, bbox_inside_weights, key_targets
 
 
 def _compute_targets(ex_rois, gt_rois, labels):
@@ -140,10 +163,7 @@ def _compute_targets(ex_rois, gt_rois, labels):
 
     assert ex_rois.shape[0] == gt_rois.shape[0]
     assert ex_rois.shape[1] == 4
-    if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
-        assert gt_rois.shape[1] == 8
-    else:
-        assert gt_rois.shape[1] == 4
+    assert gt_rois.shape[1] == 4
 
     targets = bbox_transform(ex_rois, gt_rois)
     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
@@ -195,8 +215,17 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
 
     bbox_target_data = _compute_targets(
         rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], :4], labels)
-
-    bbox_targets, bbox_inside_weights = \
-        _get_bbox_regression_labels(bbox_target_data, num_classes)
-
-    return labels, rois, bbox_targets, bbox_inside_weights
+    
+    if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+        # for simplicity regress it from the rois to key points
+        key_target_data = _compute_targets(
+            rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], 5:], labels)
+        
+        bbox_targets, bbox_inside_weights, key_targets = \
+            _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data)
+        
+        return labels, rois, bbox_targets, bbox_inside_weights, key_targets
+    else:
+        bbox_targets, bbox_inside_weights = \
+            _get_bbox_regression_labels(bbox_target_data, num_classes)
+        return labels, rois, bbox_targets, bbox_inside_weights
