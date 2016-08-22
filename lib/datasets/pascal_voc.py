@@ -111,6 +111,27 @@ class pascal_voc(imdb):
 
         return gt_roidb
 
+    def extra_roidb(self):
+        """
+        Return the database of ground-truth regions of interest.
+
+        This function loads/saves from/to a cache file to speed up future calls.
+        """
+        cache_file = os.path.join(self.cache_path, self.name + '_extra_roidb.pkl')
+        if os.path.exists(cache_file):
+            with open(cache_file, 'rb') as fid:
+                roidb = cPickle.load(fid)
+            print '{} extra roidb loaded from {}'.format(self.name, cache_file)
+            return roidb
+
+        extra_roidb = [self._load_pascal_extra_anno(index)
+                    for index in self.image_index]
+        with open(cache_file, 'wb') as fid:
+            cPickle.dump(extra_roidb, fid, cPickle.HIGHEST_PROTOCOL)
+        print 'wrote extra roidb to {}'.format(cache_file)
+
+        return extra_roidb
+
     def selective_search_roidb(self):
         """
         Return the database of selective search regions of interest.
@@ -222,6 +243,69 @@ class pascal_voc(imdb):
                 'gt_overlaps' : overlaps,
                 'flipped' : False,
                 'seg_areas' : seg_areas}
+    
+    @classmethod
+    def findbox(cls, obj, name='bndbox'):
+        bbox = obj.find(name)
+        # Make pixel indexes 0-based
+        x1 = float(bbox.find('xmin').text) - 1
+        y1 = float(bbox.find('ymin').text) - 1
+        x2 = float(bbox.find('xmax').text) - 1
+        y2 = float(bbox.find('ymax').text) - 1
+        return [x1, y1, x2, y2], (x2 - x1 + 1) * (y2 - y1 + 1)
+
+    def findcls(self, obj):
+        return self._class_to_ind[obj.find('name').text.lower().strip()]
+
+    def _load_pascal_extra_anno(self, index):
+        """
+        Load image and bounding boxes info from XML file in the PASCAL VOC
+        format.
+        """
+        filename = os.path.join(self._data_path, 'Annotations', index + '.xml')
+        tree = ET.parse(filename)
+        objs = tree.findall('object')
+        if not self.config['use_diff']:
+            # Exclude the samples labeled as difficult
+            non_diff_objs = [
+                obj for obj in objs if int(obj.find('difficult').text) == 0]
+            # if len(non_diff_objs) != len(objs):
+            #     print 'Removed {} difficult objects'.format(
+            #         len(objs) - len(non_diff_objs))
+            objs = non_diff_objs
+        num_objs = len(objs)
+
+        boxes = np.zeros((num_objs, 8), dtype=np.uint16)
+        gt_classes = np.zeros((num_objs), dtype=np.int32)
+        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
+        # "Seg" area for pascal is just the box area
+        seg_areas = np.zeros((num_objs), dtype=np.float32)
+
+        # Load object bounding boxes into a data frame.
+        for ix, obj in enumerate(objs):
+            box, seg_area = self.findbox(obj)
+            cls = self.findcls(obj)
+
+            try:
+                headbox, _ = self.findbox(obj, 'headbox')
+            except:
+                # no head box found
+                headbox = [1,1,1,1]
+            
+            boxes[ix, :] = box + headbox
+            gt_classes[ix] = cls
+            overlaps[ix, cls] = 1.0
+            seg_areas[ix] = seg_area
+
+        overlaps = scipy.sparse.csr_matrix(overlaps)
+
+        return {'boxes' : boxes,
+                'gt_classes': gt_classes,
+                'gt_overlaps' : overlaps,
+                'flipped' : False,
+                'seg_areas' : seg_areas}
+
+    
 
     def _get_comp_id(self):
         comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']
