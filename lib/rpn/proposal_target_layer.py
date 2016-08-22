@@ -140,7 +140,10 @@ def _compute_targets(ex_rois, gt_rois, labels):
 
     assert ex_rois.shape[0] == gt_rois.shape[0]
     assert ex_rois.shape[1] == 4
-    assert gt_rois.shape[1] == 4
+    if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+        assert gt_rois.shape[1] == 8
+    else:
+        assert gt_rois.shape[1] == 4
 
     targets = bbox_transform(ex_rois, gt_rois)
     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
