@@ -6,6 +6,7 @@
 # --------------------------------------------------------
 
 import os
+import __init__
 from datasets.imdb import imdb
 import datasets.ds_utils as ds_utils
 import xml.etree.ElementTree as ET
@@ -18,6 +19,13 @@ import subprocess
 import uuid
 from voc_eval import voc_eval
 from fast_rcnn.config import cfg
+import PIL
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import pandas as pd
+import shutil
+import subprocess
+import sys
 
 class pascal_voc(imdb):
     def __init__(self, image_set, year, devkit_path=None):
@@ -290,7 +298,8 @@ class pascal_voc(imdb):
                 headbox, _ = self.findbox(obj, 'headbox')
             except:
                 # no head box found
-                headbox = [1,1,1,1]
+                # headbox = [1,1,1,1]
+                headbox = [box[0]+(box[2]-box[0])/4., box[1]+(box[3]-box[1])/4., box[2]-(box[2]-box[0])/4., box[3]-(box[3]-box[1])/4.]
             
             boxes[ix, :] = box + headbox
             gt_classes[ix] = cls
@@ -305,6 +314,32 @@ class pascal_voc(imdb):
                 'flipped' : False,
                 'seg_areas' : seg_areas}
 
+    def show_generated_annotations(self):
+        for index in self.image_index:
+            blob = self._load_pascal_extra_anno(index)
+            boxes=blob['boxes']
+            gt_classes=blob['gt_classes']
+            plt.cla()
+            plt.imshow(PIL.Image.open(self.image_path_from_index(index)))
+            for bbox, person in zip(boxes, gt_classes):
+                edgecolor = 'black'
+                linewidth = 1
+                plt.gca().add_patch(
+                Rectangle((bbox[0], bbox[1]),
+                            bbox[2] - bbox[0],
+                            bbox[3] - bbox[1], edgecolor=edgecolor,linewidth=linewidth, fill=False)
+                )
+                plt.gca().add_patch(
+                Rectangle((bbox[0+4], bbox[1+4]),
+                            bbox[2+4] - bbox[0+4],
+                            bbox[3+4] - bbox[1+4], edgecolor='yellow',linewidth=linewidth, fill=False)
+                )
+            savedir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../output/gt')
+            if not os.path.exists(savedir):
+                os.mkdir(savedir)
+            savedir = os.path.join(savedir, index+'.png')
+            plt.savefig(savedir, bbox_inches='tight')
+            plt.show()
     
 
     def _get_comp_id(self):
@@ -423,6 +458,6 @@ class pascal_voc(imdb):
 
 if __name__ == '__main__':
     from datasets.pascal_voc import pascal_voc
-    d = pascal_voc('trainval', '2007')
-    res = d.roidb
-    from IPython import embed; embed()
+    for i in ['trainval', 'test']:
+        d = pascal_voc(i, '2007')    
+        d.show_generated_annotations()
