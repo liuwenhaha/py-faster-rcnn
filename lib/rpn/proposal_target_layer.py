@@ -38,6 +38,8 @@ class ProposalTargetLayer(caffe.Layer):
         if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
             # key_targets
             top[5].reshape(1, self._num_classes * 4)
+            # key_inside_weights
+            top[6].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
@@ -71,7 +73,7 @@ class ProposalTargetLayer(caffe.Layer):
         # Sample rois with classification labels and bounding box regression
         # targets
         if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
-            labels, rois, bbox_targets, bbox_inside_weights, key_targets = _sample_rois(
+            labels, rois, bbox_targets, bbox_inside_weights, key_targets, key_inside_weights = _sample_rois(
             all_rois, gt_boxes, fg_rois_per_image,
             rois_per_image, self._num_classes)
         else:   
@@ -116,6 +118,9 @@ class ProposalTargetLayer(caffe.Layer):
         if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
             top[5].reshape(*key_targets.shape)
             top[5].data[...] = key_targets
+            # key_inside_weights
+            top[6].reshape(*key_inside_weights.shape)
+            top[6].data[...] = key_inside_weights
 
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""
@@ -126,7 +131,7 @@ class ProposalTargetLayer(caffe.Layer):
         pass
 
 
-def _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data=None):
+def _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data=None, gt_keys=None):
     """Bounding-box regression targets (bbox_target_data) are stored in a
     compact form N x (class, tx, ty, tw, th)
 
@@ -152,6 +157,7 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data=N
         return bbox_targets, bbox_inside_weights
     else:
         key_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
+        key_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
         for ind in inds:
             cls = clss[ind]
             start = 4 * cls
@@ -159,7 +165,10 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data=N
             bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
             key_targets[ind, start:end] = key_target_data[ind, 1:]
             bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
-        return bbox_targets, bbox_inside_weights, key_targets
+            if np.any(gt_keys[ind, :] != 0.):
+                key_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
+
+        return bbox_targets, bbox_inside_weights, key_targets, key_inside_weights
 
 
 def _compute_targets(ex_rois, gt_rois, labels):
@@ -221,19 +230,20 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
         rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], :4], labels)
     
     if cfg.TRAIN.PROPOSAL_METHOD == 'extra':
+        if DEBUG:
+            print gt_boxes
+            # for i, j in zip(bbox_target_data, key_target_data):
+            #     print i,j, "pair"
+            # print bbox_target_data, "bbox_target_data"
+            # print key_target_data, "key_target_data"
         # for simplicity regress it from the rois to key points
         key_target_data = _compute_targets(
             rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], 5:], labels)
         
-        if DEBUG:
-            for i, j in zip(bbox_target_data, key_target_data):
-                print i,j, "pair"
-            # print bbox_target_data, "bbox_target_data"
-            # print key_target_data, "key_target_data"
-        bbox_targets, bbox_inside_weights, key_targets = \
-            _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data)
+        bbox_targets, bbox_inside_weights, key_targets, key_inside_weights = \
+            _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data, gt_boxes[gt_assignment[keep_inds], 5:])
         
-        return labels, rois, bbox_targets, bbox_inside_weights, key_targets
+        return labels, rois, bbox_targets, bbox_inside_weights, key_targets, key_inside_weights
     else:
         bbox_targets, bbox_inside_weights = \
             _get_bbox_regression_labels(bbox_target_data, num_classes)

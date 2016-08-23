@@ -336,6 +336,7 @@ layer {
   top: 'bbox_inside_weights'
   top: 'bbox_outside_weights'
   top: 'key_targets'  
+  top: 'key_inside_weights'
   python_param {
     module: 'rpn.proposal_target_layer'
     layer: 'ProposalTargetLayer'
@@ -513,7 +514,7 @@ layer {
   type: "SmoothL1Loss"
   bottom: "key_pred"
   bottom: "key_targets"
-  bottom: "bbox_inside_weights"
+  bottom: "key_inside_weights"
   bottom: "bbox_outside_weights"
   top: "loss_key"
   loss_weight: 1

@@ -298,7 +298,7 @@ class pascal_voc(imdb):
                 headbox, _ = self.findbox(obj, 'headbox')
             except:
                 # no head box found
-                headbox = [1., 1., 1., 1.]
+                headbox = [0., 0., 0., 0.]
             
             boxes[ix, :] = box + headbox
             gt_classes[ix] = cls

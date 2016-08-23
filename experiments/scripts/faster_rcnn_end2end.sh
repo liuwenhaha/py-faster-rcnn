@@ -30,8 +30,8 @@ case $DATASET in
     ITERS=70000
     ;;
   12)
-    TRAIN_IMDB="voc_2012_train"
-    TEST_IMDB="voc_2012_val"
+    TRAIN_IMDB="voc_2012_trainval"
+    TEST_IMDB="voc_2007_test"
     PT_DIR="pascal_voc"
     ITERS=70000
     ;;

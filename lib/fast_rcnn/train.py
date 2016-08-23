@@ -13,6 +13,7 @@ import roi_data_layer.roidb as rdl_roidb
 from utils.timer import Timer
 import numpy as np
 import os
+import os.path as osp
 
 from caffe.proto import caffe_pb2
 import google.protobuf as pb2
@@ -51,6 +52,25 @@ class SolverWrapper(object):
             pb2.text_format.Merge(f.read(), self.solver_param)
 
         self.solver.net.layers[0].set_roidb(roidb)
+        
+        self.predictions = ['bbox_pred']
+        if 'key_pred' in self.solver.net.params:
+            self.predictions.append('key_pred')  
+
+        self.scale_bbox_params = (cfg.TRAIN.BBOX_REG and
+                             cfg.TRAIN.BBOX_NORMALIZE_TARGETS and
+                             self.solver.net.params.has_key('bbox_pred'))                  
+        
+        modelname = osp.basename(pretrained_model)
+        if self.scale_bbox_params and modelname not in ["VGG16.v2.caffemodel",  "VGG_CNN_M_1024.v2.caffemodel" , "ZF.v2.caffemodel"]:
+            print "resuming from {}".format(modelname)
+            for key in self.predictions:
+                # scale and shift with bbox reg unnormalization; then save snapshot
+                self.solver.net.params[key][0].data[...] = \
+                        (self.solver.net.params[key][0].data /
+                        self.bbox_stds[:, np.newaxis])
+                self.solver.net.params[key][1].data[...] = \
+                        (self.solver.net.params[key][1].data - self.bbox_means) / self.bbox_stds
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
@@ -58,22 +78,21 @@ class SolverWrapper(object):
         """
         net = self.solver.net
 
-        scale_bbox_params = (cfg.TRAIN.BBOX_REG and
-                             cfg.TRAIN.BBOX_NORMALIZE_TARGETS and
-                             net.params.has_key('bbox_pred'))
+        if self.scale_bbox_params:
+            orig = []
+            for key in self.predictions:
+                # save original values
+                orig_0 = net.params[key][0].data.copy()
+                orig_1 = net.params[key][1].data.copy()
+                orig.append([orig_0, orig_1])
 
-        if scale_bbox_params:
-            # save original values
-            orig_0 = net.params['bbox_pred'][0].data.copy()
-            orig_1 = net.params['bbox_pred'][1].data.copy()
-
-            # scale and shift with bbox reg unnormalization; then save snapshot
-            net.params['bbox_pred'][0].data[...] = \
-                    (net.params['bbox_pred'][0].data *
-                     self.bbox_stds[:, np.newaxis])
-            net.params['bbox_pred'][1].data[...] = \
-                    (net.params['bbox_pred'][1].data *
-                     self.bbox_stds + self.bbox_means)
+                # scale and shift with bbox reg unnormalization; then save snapshot
+                net.params[key][0].data[...] = \
+                        (net.params[key][0].data *
+                        self.bbox_stds[:, np.newaxis])
+                net.params[key][1].data[...] = \
+                        (net.params[key][1].data *
+                        self.bbox_stds + self.bbox_means)
 
         infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
                  if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
@@ -84,10 +103,11 @@ class SolverWrapper(object):
         net.save(str(filename))
         print 'Wrote snapshot to: {:s}'.format(filename)
 
-        if scale_bbox_params:
-            # restore net to original state
-            net.params['bbox_pred'][0].data[...] = orig_0
-            net.params['bbox_pred'][1].data[...] = orig_1
+        if self.scale_bbox_params:
+            for idx, key in enumerate(self.predictions):
+                # restore net to original state
+                net.params[key][0].data[...] = orig[idx][0]
+                net.params[key][1].data[...] = orig[idx][1]
         return filename
 
     def train_model(self, max_iters):

@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import numpy as np
 
-haskeys = False
+haskeys = True
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -188,7 +188,7 @@ def im_detect(net, im, boxes=None):
 
 
     # Apply bounding-box regression deltas
-    if blobs_out.has_key('key_pred'):
+    if 'key_pred' in blobs_out:
         key_deltas = blobs_out['key_pred']
         pred_keys = bbox_transform_inv(boxes, key_deltas)
         pred_keys = clip_boxes(pred_keys, im.shape)
@@ -219,12 +219,13 @@ def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
                         bbox[3] - bbox[1], fill=False,
                         edgecolor=edgecolor, linewidth=linewidth)
             )
-            ax.add_patch(
-            Rectangle((key[0], key[1]),
-                        key[2] - key[0],
-                        key[3] - key[1], fill=False,
-                        edgecolor='yellow', linewidth=linewidth)
-            )
+            if class_name == 'person':
+                ax.add_patch(
+                Rectangle((key[0], key[1]),
+                            key[2] - key[0],
+                            key[3] - key[1], fill=False,
+                            edgecolor='yellow', linewidth=linewidth)
+                )
             ax.text(bbox[0] + 3, bbox[1]+7,
                     '{:s} {:.3f}'.format(class_name, score),# bbox=dict(facecolor='blue', alpha=0.5),
             )
