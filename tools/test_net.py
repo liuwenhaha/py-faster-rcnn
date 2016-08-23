@@ -17,6 +17,7 @@ import caffe
 import argparse
 import pprint
 import time, os, sys
+import numpy as np
 
 def parse_args():
     """
@@ -49,6 +50,8 @@ def parse_args():
     parser.add_argument('--num_dets', dest='max_per_image',
                         help='max number of detections per image',
                         default=100, type=int)
+    parser.add_argument('--rpn', dest='rpn',
+                        help='eval recall', action='store_true')                        
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -57,6 +60,36 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def eval_recall(net, imdb):
+    res = \
+        imdb.evaluate_recall(net=net)
+    ar=res["ar"]
+    gt_overlaps=res["gt_overlaps"]
+    recalls=res["recalls"]
+    thresholds=res["thresholds"]
+
+    print 'Method: {}'.format("RPN")
+    print 'AverageRec: {}'.format(ar)
+
+    def recall_at(t):
+        ind = np.where(thresholds > t - 1e-5)[0][0]
+        assert np.isclose(thresholds[ind], t)
+        return recalls[ind]
+
+    print 'Recall@0.5: {}'.format(recall_at(0.5))
+    print 'Recall@0.6: {}'.format(recall_at(0.6))
+    print 'Recall@0.7: {}'.format(recall_at(0.7))
+    print 'Recall@0.8: {}'.format(recall_at(0.8))
+    print 'Recall@0.9: {}'.format(recall_at(0.9))
+    # print again for easy spreadsheet copying
+    print '{:.3f}'.format(ar)
+    print '{:.3f}'.format(recall_at(0.5))
+    print '{:.3f}'.format(recall_at(0.6))
+    print '{:.3f}'.format(recall_at(0.7))
+    print '{:.3f}'.format(recall_at(0.8))
+    print '{:.3f}'.format(recall_at(0.9))
+
+    
 if __name__ == '__main__':
     args = parse_args()
 
@@ -86,5 +119,9 @@ if __name__ == '__main__':
     imdb.competition_mode(args.comp_mode)
     if not cfg.TEST.HAS_RPN:
         imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
+    
+    if args.rpn:
+        eval_recall(net, imdb)
+    else:
+        test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis, modelname=args.caffemodel, imdbname=args.imdb_name)
 
-    test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis)

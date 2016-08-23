@@ -18,6 +18,11 @@ from fast_rcnn.nms_wrapper import nms
 import cPickle
 from utils.blob import im_list_to_blob
 import os
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import numpy as np
+
+haskeys = False
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -181,26 +186,48 @@ def im_detect(net, im, boxes=None):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
+
+    # Apply bounding-box regression deltas
+    if blobs_out.has_key('key_pred'):
+        key_deltas = blobs_out['key_pred']
+        pred_keys = bbox_transform_inv(boxes, key_deltas)
+        pred_keys = clip_boxes(pred_keys, im.shape)
+    
+        return scores, pred_boxes, pred_keys
+
     return scores, pred_boxes
 
-def vis_detections(im, class_name, dets, thresh=0.3):
+def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
     """Visual debugging of detections."""
-    import matplotlib.pyplot as plt
+
     im = im[:, :, (2, 1, 0)]
+    if class_name == '2person':
+        edgecolor = 'green'
+        linewidth = 2
+    else:
+        linewidth = 1
+        edgecolor='r'
+
     for i in xrange(np.minimum(10, dets.shape[0])):
         bbox = dets[i, :4]
-        score = dets[i, -1]
+        key = dets[i, 5:]
+        score = dets[i, 4]
         if score > thresh:
-            plt.cla()
-            plt.imshow(im)
-            plt.gca().add_patch(
-                plt.Rectangle((bbox[0], bbox[1]),
-                              bbox[2] - bbox[0],
-                              bbox[3] - bbox[1], fill=False,
-                              edgecolor='g', linewidth=3)
-                )
-            plt.title('{}  {:.3f}'.format(class_name, score))
-            plt.show()
+            ax.add_patch(
+            Rectangle((bbox[0], bbox[1]),
+                        bbox[2] - bbox[0],
+                        bbox[3] - bbox[1], fill=False,
+                        edgecolor=edgecolor, linewidth=linewidth)
+            )
+            ax.add_patch(
+            Rectangle((key[0], key[1]),
+                        key[2] - key[0],
+                        key[3] - key[1], fill=False,
+                        edgecolor='yellow', linewidth=linewidth)
+            )
+            ax.text(bbox[0] + 3, bbox[1]+7,
+                    '{:s} {:.3f}'.format(class_name, score),# bbox=dict(facecolor='blue', alpha=0.5),
+            )
 
 def apply_nms(all_boxes, thresh):
     """Apply non-maximum suppression to all predicted boxes output by the
@@ -224,8 +251,21 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
+def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None, imdbname=''):
     """Test a Fast R-CNN network on an image database."""
+    if modelname is None:
+        modelname = 'images'
+    else:
+        modelname = os.path.splitext(os.path.basename(modelname))[0]
+
+    if vis == True:
+        savepath='output/im_'
+        # if shownms:
+        #     savepath+='nms_'
+        savepath+=modelname+imdbname
+        if not os.path.exists(savepath):
+            os.mkdir(savepath)
+
     num_images = len(imdb.image_index)
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
@@ -238,13 +278,45 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
     # timers
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
 
-    if not cfg.TEST.HAS_RPN:
-        roidb = imdb.roidb
+    # if not cfg.TEST.HAS_RPN:
+    #     roidb = imdb.roidb
+
+    roidb = imdb.gt_roidb()
 
     for i in xrange(num_images):
+        # i = 13
+        im = cv2.imread(imdb.image_path_at(i))
+        if vis:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            ax.imshow(im[:, :, (2, 1, 0)])  
         # filter out any ground truth boxes
         if cfg.TEST.HAS_RPN:
             box_proposals = None
+
+            _, im_scales = _get_blobs(im, box_proposals)
+
+            # gt boxes: (x1, y1, x2, y2, cls)
+            gt_inds = np.where(roidb[i]['gt_classes'] != 0)[0]
+            gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
+            gt_boxes[:, 0:4] = roidb[i]['boxes'][gt_inds, :] # * im_scales[0]
+            gt_boxes[:, 4] = roidb[i]['gt_classes'][gt_inds]
+
+            if vis:
+                for gt_box in gt_boxes:
+                    print gt_box
+                    ax.add_patch(
+                        Rectangle((gt_box[0], gt_box[1]),
+                                gt_box[2] - gt_box[0],
+                                gt_box[3] - gt_box[1], fill=False, linewidth=1)
+                    )
+                    # ax.add_patch(
+                    #         Rectangle((gt_box[0+5], gt_box[1+5]),
+                    #                 gt_box[2+5] - gt_box[0+5],
+                    #                 gt_box[3+5] - gt_box[1+5], fill=False, linewidth=1)
+                    #     )
+                
+                
         else:
             # The roidb may contain ground-truth rois (for example, if the roidb
             # comes from the training or val split). We only want to evaluate
@@ -253,12 +325,15 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
             # ground truth.
             box_proposals = roidb[i]['boxes'][roidb[i]['gt_classes'] == 0]
 
-        im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
-        scores, boxes = im_detect(net, im, box_proposals)
+        if not haskeys:
+            scores, boxes = im_detect(net, im, box_proposals)
+        else:
+            scores, boxes, keys = im_detect(net, im, box_proposals)
         _t['im_detect'].toc()
 
         _t['misc'].tic()
+           
         # skip j = 0, because it's the background class
         for j in xrange(1, imdb.num_classes):
             inds = np.where(scores[:, j] > thresh)[0]
@@ -268,9 +343,35 @@ def test_net(net, imdb, max_per_image=100, thresh=0.05, vis=False):
                 .astype(np.float32, copy=False)
             keep = nms(cls_dets, cfg.TEST.NMS)
             cls_dets = cls_dets[keep, :]
+            if haskeys:
+                cls_keys = keys[inds, j*4:(j+1)*4]
+                cls_dets = np.hstack((cls_dets, cls_keys[keep, :])) \
+                    .astype(np.float32, copy=False)
             if vis:
-                vis_detections(im, imdb.classes[j], cls_dets)
-            all_boxes[j][i] = cls_dets
+                vis_detections(im, imdb.classes[j], cls_dets, ax=ax)
+
+            all_boxes[j][i] = cls_dets[:, :5]
+            # all_boxes[j][i] = cls_dets
+
+        if vis:
+            ax.axis((0,im.shape[1],im.shape[0], 0))
+            ax.tick_params(
+                axis='both',          # changes apply to the x-axis
+                which='both',      # both major and minor ticks are affected
+                bottom='off',      # ticks along the bottom edge are off
+                top='off',         # ticks along the top edge are off
+                left='off',      # ticks along the bottom edge are off
+                right='off',         # ticks along the top edge are off
+                labelleft='off',
+                labelright='off',
+                labeltop='off',
+                labelbottom='off') # labels along the bottom edge are off
+            save_dir = savepath+'/'+str(i)+'.png'
+            # plt.title(save_dir)
+            
+            plt.savefig(save_dir, bbox_inches='tight')
+            plt.show()
+            plt.close()
 
         # Limit to max_per_image detections *over all classes*
         if max_per_image > 0:

@@ -298,8 +298,7 @@ class pascal_voc(imdb):
                 headbox, _ = self.findbox(obj, 'headbox')
             except:
                 # no head box found
-                # headbox = [1,1,1,1]
-                headbox = [box[0]+(box[2]-box[0])/4., box[1]+(box[3]-box[1])/4., box[2]-(box[2]-box[0])/4., box[3]-(box[3]-box[1])/4.]
+                headbox = [1., 1., 1., 1.]
             
             boxes[ix, :] = box + headbox
             gt_classes[ix] = cls
@@ -339,7 +338,7 @@ class pascal_voc(imdb):
                 os.mkdir(savedir)
             savedir = os.path.join(savedir, index+'.png')
             plt.savefig(savedir, bbox_inches='tight')
-            plt.show()
+            # plt.show()
     
 
     def _get_comp_id(self):
@@ -458,6 +457,9 @@ class pascal_voc(imdb):
 
 if __name__ == '__main__':
     from datasets.pascal_voc import pascal_voc
-    for i in ['trainval', 'test']:
-        d = pascal_voc(i, '2007')    
+    for i in ['train','val']:
+        d = pascal_voc(i, '2012')    
         d.show_generated_annotations()
+    # for i in ['trainval', 'test']:
+    #     d = pascal_voc(i, '2007')    
+    #     d.show_generated_annotations()

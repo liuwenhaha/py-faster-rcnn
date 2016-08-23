@@ -80,14 +80,18 @@ class ProposalTargetLayer(caffe.Layer):
             rois_per_image, self._num_classes)
 
         if DEBUG:
-            print 'num fg: {}'.format((labels > 0).sum())
-            print 'num bg: {}'.format((labels == 0).sum())
-            self._count += 1
-            self._fg_num += (labels > 0).sum()
-            self._bg_num += (labels == 0).sum()
-            print 'num fg avg: {}'.format(self._fg_num / self._count)
-            print 'num bg avg: {}'.format(self._bg_num / self._count)
-            print 'ratio: {:.3f}'.format(float(self._fg_num) / float(self._bg_num))
+            pass
+            # print gt_boxes, "gt"
+            # print bbox_targets, "bbox"
+            # print key_targets, "key"
+            # print 'num fg: {}'.format((labels > 0).sum())
+            # print 'num bg: {}'.format((labels == 0).sum())
+            # self._count += 1
+            # self._fg_num += (labels > 0).sum()
+            # self._bg_num += (labels == 0).sum()
+            # print 'num fg avg: {}'.format(self._fg_num / self._count)
+            # print 'num bg avg: {}'.format(self._bg_num / self._count)
+            # print 'ratio: {:.3f}'.format(float(self._fg_num) / float(self._bg_num))
 
         # sampled rois
         top[0].reshape(*rois.shape)
@@ -221,6 +225,11 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
         key_target_data = _compute_targets(
             rois[:, 1:5], gt_boxes[gt_assignment[keep_inds], 5:], labels)
         
+        if DEBUG:
+            for i, j in zip(bbox_target_data, key_target_data):
+                print i,j, "pair"
+            # print bbox_target_data, "bbox_target_data"
+            # print key_target_data, "key_target_data"
         bbox_targets, bbox_inside_weights, key_targets = \
             _get_bbox_regression_labels(bbox_target_data, num_classes, key_target_data)
         
