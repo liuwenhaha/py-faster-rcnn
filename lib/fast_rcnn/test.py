@@ -197,7 +197,7 @@ def im_detect(net, im, boxes=None):
 
     return scores, pred_boxes
 
-def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
+def vis_detections(im, class_name, dets, thresh=0.5, ax=None):
     """Visual debugging of detections."""
     savehuman=False
 
@@ -229,7 +229,7 @@ def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
                             edgecolor='yellow', linewidth=linewidth)
                 )
             ax.text(bbox[0] + 3, bbox[1]+7,
-                    '{:s} {:.3f}'.format(class_name, score),# bbox=dict(facecolor='blue', alpha=0.5),
+                    '{:s} {:.3f}'.format(class_name, score), color='green'# bbox=dict(facecolor='blue', alpha=0.5),
             )
     return savehuman
 
@@ -339,6 +339,7 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
         _t['misc'].tic()
            
         # skip j = 0, because it's the background class
+        savehuman = False
         for j in xrange(1, imdb.num_classes):
             inds = np.where(scores[:, j] > thresh)[0]
             cls_scores = scores[inds, j]
@@ -352,8 +353,8 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
                 cls_dets = np.hstack((cls_dets, cls_keys[keep, :])) \
                     .astype(np.float32, copy=False)
             if vis:
-                savehuman = vis_detections(im, imdb.classes[j], cls_dets, ax=ax)
-
+                if vis_detections(im, imdb.classes[j], cls_dets, ax=ax):
+                    savehuman = True
             all_boxes[j][i] = cls_dets[:, :5]
             # all_boxes[j][i] = cls_dets
 
