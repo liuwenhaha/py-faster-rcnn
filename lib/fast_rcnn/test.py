@@ -371,7 +371,7 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
             # plt.title(save_dir)
             
             plt.savefig(save_dir, bbox_inches='tight')
-            plt.show()
+            # plt.show()
             plt.close()
 
         # Limit to max_per_image detections *over all classes*

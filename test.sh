@@ -1,1 +1,1 @@
-./tools/test_net.py --gpu 3 --def models/pascal_voc/VGG_CNN_M_1024/key/test.prototxt --net output/faster_rcnn_end2end/voc_2012_trainval/vgg_cnn_m_1024_faster_rcnn_iter_10000.caffemodel --cfg experiments/cfgs/key.yml --vis
+./tools/test_net.py --gpu $1 --def models/pascal_voc/VGG_CNN_M_1024/key/test.prototxt --net output/faster_rcnn_end2end/voc_2012_trainval/vgg_cnn_m_1024_faster_rcnn_iter_70000.caffemodel --cfg experiments/cfgs/key.yml --vis
