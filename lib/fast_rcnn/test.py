@@ -199,6 +199,7 @@ def im_detect(net, im, boxes=None):
 
 def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
     """Visual debugging of detections."""
+    savehuman=False
 
     im = im[:, :, (2, 1, 0)]
     if class_name == '2person':
@@ -220,6 +221,7 @@ def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
                         edgecolor=edgecolor, linewidth=linewidth)
             )
             if class_name == 'person':
+                savehuman=True
                 ax.add_patch(
                 Rectangle((key[0], key[1]),
                             key[2] - key[0],
@@ -229,6 +231,7 @@ def vis_detections(im, class_name, dets, thresh=0.3, ax=None):
             ax.text(bbox[0] + 3, bbox[1]+7,
                     '{:s} {:.3f}'.format(class_name, score),# bbox=dict(facecolor='blue', alpha=0.5),
             )
+    return savehuman
 
 def apply_nms(all_boxes, thresh):
     """Apply non-maximum suppression to all predicted boxes output by the
@@ -349,7 +352,7 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
                 cls_dets = np.hstack((cls_dets, cls_keys[keep, :])) \
                     .astype(np.float32, copy=False)
             if vis:
-                vis_detections(im, imdb.classes[j], cls_dets, ax=ax)
+                savehuman = vis_detections(im, imdb.classes[j], cls_dets, ax=ax)
 
             all_boxes[j][i] = cls_dets[:, :5]
             # all_boxes[j][i] = cls_dets
@@ -370,7 +373,8 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
             save_dir = savepath+'/'+str(i)+'.png'
             # plt.title(save_dir)
             
-            plt.savefig(save_dir, bbox_inches='tight')
+            if savehuman:
+                plt.savefig(save_dir, bbox_inches='tight')
             # plt.show()
             plt.close()
 
