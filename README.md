@@ -1,3 +1,8 @@
+### TODO
+- [ ] eval recall 
+- [ ] show rpn Proposals
+- [ ] add G
+
 ### Disclaimer
 
 The official Faster R-CNN code (written in MATLAB) is available [here](https://github.com/ShaoqingRen/faster_rcnn).
