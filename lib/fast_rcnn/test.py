@@ -124,7 +124,6 @@ def im_detect(net, im, boxes=None):
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
     blobs, im_scales = _get_blobs(im, boxes)
-
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
     # (some distinct image ROIs get mapped to the same feature ROI).
     # Here, we identify duplicate feature ROIs, so we only compute features
@@ -262,6 +261,14 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
     else:
         modelname = os.path.splitext(os.path.basename(modelname))[0]
 
+    # for key in ['bbox_pred', 'key_pred']:
+    #     # scale and shift with bbox reg unnormalization; then save snapshot
+    #     net.params[key][0].data[...] = \
+    #             (net.params[key][0].data /
+    #             0.1)
+    #     net.params[key][1].data[...] = \
+    #             net.params[key][1].data / 0.1
+
     if vis == True:
         savepath='output/im_'
         # if shownms:
@@ -343,6 +350,7 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
         for j in xrange(1, imdb.num_classes):
             inds = np.where(scores[:, j] > thresh)[0]
             cls_scores = scores[inds, j]
+            print j,cls_scores
             cls_boxes = boxes[inds, j*4:(j+1)*4]
             cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
                 .astype(np.float32, copy=False)

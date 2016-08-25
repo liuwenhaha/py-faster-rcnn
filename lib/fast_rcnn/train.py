@@ -56,21 +56,22 @@ class SolverWrapper(object):
         self.predictions = ['bbox_pred']
         if 'key_pred' in self.solver.net.params:
             self.predictions.append('key_pred')  
-
-        self.scale_bbox_params = (cfg.TRAIN.BBOX_REG and
-                             cfg.TRAIN.BBOX_NORMALIZE_TARGETS and
-                             self.solver.net.params.has_key('bbox_pred'))                  
         
-        modelname = osp.basename(pretrained_model)
-        if self.scale_bbox_params and modelname not in ["VGG16.v2.caffemodel",  "VGG_CNN_M_1024.v2.caffemodel" , "ZF.v2.caffemodel"]:
-            print "resuming from {}".format(modelname)
-            for key in self.predictions:
-                # scale and shift with bbox reg unnormalization; then save snapshot
-                self.solver.net.params[key][0].data[...] = \
-                        (self.solver.net.params[key][0].data /
-                        self.bbox_stds[:, np.newaxis])
-                self.solver.net.params[key][1].data[...] = \
-                        (self.solver.net.params[key][1].data - self.bbox_means) / self.bbox_stds
+        self.scale_bbox_params = (cfg.TRAIN.BBOX_REG and
+                            cfg.TRAIN.BBOX_NORMALIZE_TARGETS and
+                            self.solver.net.params.has_key('bbox_pred'))                  
+            
+        if pretrained_model is not None:
+            modelname = osp.basename(pretrained_model)
+            if self.scale_bbox_params and modelname not in ["VGG16.v2.caffemodel",  "VGG_CNN_M_1024.v2.caffemodel" , "ZF.v2.caffemodel"]:
+                print "FATAL, resuming from {}".format(modelname)
+                for key in self.predictions:
+                    # scale and shift with bbox reg unnormalization; then save snapshot
+                    self.solver.net.params[key][0].data[...] = \
+                            (self.solver.net.params[key][0].data /
+                            self.bbox_stds[:, np.newaxis])
+                    self.solver.net.params[key][1].data[...] = \
+                            (self.solver.net.params[key][1].data - self.bbox_means) / self.bbox_stds
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
