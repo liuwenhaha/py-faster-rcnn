@@ -1,5 +1,5 @@
 ### TODO
-- [ ] eval recall 
+- [x] eval recall 
 - [ ] show rpn Proposals
 - [ ] add G
 
