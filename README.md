@@ -5,8 +5,9 @@
 - [x] vis anchor
 - [x] show rpn Proposals
 - [x] show same position Proposals
-- [ ] ploter
-- [ ] add G
+- [x] ploter
+- [ ] add test G
+- [ ] add train G
 
 ### Disclaimer
 
