@@ -109,6 +109,14 @@ class imdb(object):
             boxes[:, 0] = widths[i] - oldx2 - 1
             boxes[:, 2] = widths[i] - oldx1 - 1
             assert (boxes[:, 2] >= boxes[:, 0]).all()
+            
+            # flip head box
+            oldx1 = boxes[:, 0+4].copy()
+            oldx2 = boxes[:, 2+4].copy()
+            boxes[:, 0+4] = widths[i] - oldx2 - 1
+            boxes[:, 2+4] = widths[i] - oldx1 - 1
+            assert (boxes[:, 2+4] >= boxes[:, 0+4]).all()
+            
             entry = {'boxes' : boxes,
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],
                      'gt_classes' : self.roidb[i]['gt_classes'],
