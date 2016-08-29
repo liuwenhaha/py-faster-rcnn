@@ -40,6 +40,8 @@ class ProposalTargetLayer(caffe.Layer):
             top[5].reshape(1, self._num_classes * 4)
             # key_inside_weights
             top[6].reshape(1, self._num_classes * 4)
+            # bbox_outside_weights
+            top[7].reshape(1, self._num_classes * 4)
 
     def forward(self, bottom, top):
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
@@ -121,6 +123,10 @@ class ProposalTargetLayer(caffe.Layer):
             # key_inside_weights
             top[6].reshape(*key_inside_weights.shape)
             top[6].data[...] = key_inside_weights
+
+            # key_outside_weights
+            top[7].reshape(*key_inside_weights.shape)
+            top[7].data[...] = np.array(key_inside_weights > 0).astype(np.float32)
 
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""

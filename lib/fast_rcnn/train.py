@@ -162,8 +162,32 @@ def filter_roidb(roidb):
         valid = len(fg_inds) > 0 or len(bg_inds) > 0
         return valid
 
+    def has_head(entry):
+        # Valid images have:
+        #   (1) At least one foreground RoI OR
+        #   (2) At least one background RoI
+        overlaps = entry['max_overlaps']
+        # find boxes with sufficient overlap
+        fg_inds = np.where(overlaps >= cfg.TRAIN.FG_THRESH)[0]
+        # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
+        bg_inds = np.where((overlaps < cfg.TRAIN.BG_THRESH_HI) &
+                           (overlaps >= cfg.TRAIN.BG_THRESH_LO))[0]
+        
+        head = False
+        if 15 in entry['gt_classes']:
+            for i in entry['boxes'][entry['gt_classes'] == 15]:
+                if np.any(i[4:] > 0):
+                    head = True
+                    break
+
+        if not head:
+            return False
+        # image is only valid if such boxes exist
+        valid = len(fg_inds) > 0 or len(bg_inds) > 0
+        return valid
+
     num = len(roidb)
-    filtered_roidb = [entry for entry in roidb if is_valid(entry)]
+    filtered_roidb = [entry for entry in roidb if has_head(entry)]
     num_after = len(filtered_roidb)
     print 'Filtered {} roidb entries: {} -> {}'.format(num - num_after,
                                                        num, num_after)

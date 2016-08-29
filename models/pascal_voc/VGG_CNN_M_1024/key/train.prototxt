@@ -337,6 +337,8 @@ layer {
   top: 'bbox_outside_weights'
   top: 'key_targets'  
   top: 'key_inside_weights'
+  top: "key_outside_weights"
+
   python_param {
     module: 'rpn.proposal_target_layer'
     layer: 'ProposalTargetLayer'
@@ -515,7 +517,7 @@ layer {
   bottom: "key_pred"
   bottom: "key_targets"
   bottom: "key_inside_weights"
-  bottom: "bbox_outside_weights"
+  bottom: "key_outside_weights"
   top: "loss_key"
   loss_weight: 1
 }
