@@ -1,3 +1,5 @@
+core
+*.DS_Store
 output/
 .vscode/
 *.pyc
