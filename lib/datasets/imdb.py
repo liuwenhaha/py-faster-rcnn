@@ -111,12 +111,17 @@ class imdb(object):
             assert (boxes[:, 2] >= boxes[:, 0]).all()
             
             # flip head box
-            oldx1 = boxes[:, 0+4].copy()
-            oldx2 = boxes[:, 2+4].copy()
-            boxes[:, 0+4] = widths[i] - oldx2 - 1
-            boxes[:, 2+4] = widths[i] - oldx1 - 1
-            assert (boxes[:, 2+4] >= boxes[:, 0+4]).all()
-            
+            heads = np.where(np.any(boxes[:, 4:] > 0, axis=1))
+            oldx1 = boxes[heads, 0+4].copy()
+            oldx2 = boxes[heads, 2+4].copy()
+            boxes[heads, 0+4] = np.maximum(np.maximum(widths[i] - oldx2, 0), 1) - 1
+            boxes[heads, 2+4] = np.maximum(np.maximum(widths[i] - oldx1, 0), 1) - 1
+            if not (boxes[heads, 2+4] >= boxes[heads, 0+4]).all():
+                print self.roidb[i]['boxes'].copy()
+                print boxes
+                from IPython import embed; embed() 
+            assert (boxes[heads, 2+4] >= boxes[heads, 0+4]).all()
+
             entry = {'boxes' : boxes,
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],
                      'gt_classes' : self.roidb[i]['gt_classes'],

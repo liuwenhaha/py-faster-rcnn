@@ -187,7 +187,7 @@ def filter_roidb(roidb):
         return valid
 
     num = len(roidb)
-    filtered_roidb = [entry for entry in roidb if has_head(entry)]
+    filtered_roidb = [entry for entry in roidb if is_valid(entry)]
     num_after = len(filtered_roidb)
     print 'Filtered {} roidb entries: {} -> {}'.format(num - num_after,
                                                        num, num_after)

@@ -24,6 +24,12 @@ import numpy as np
 
 haskeys = True
 
+def mask_arr(arr, mask_out):
+    n = len(arr)
+    mask = np.ones(n, dtype=np.bool)
+    mask[mask_out] = False
+    return arr[np.arange(n)[mask], :]
+
 def _get_image_blob(im):
     """Converts an image into a network input.
 
@@ -196,15 +202,17 @@ def im_detect(net, im, boxes=None):
 
     return scores, pred_boxes
 
-def vis_detections(im, class_name, dets, thresh=0.5, ax=None):
+def vis_detections(im, class_name, dets, thresh=0.5, ax=None, shownms=False):
     """Visual debugging of detections."""
     savehuman=False
 
     im = im[:, :, (2, 1, 0)]
-    if class_name == '2person':
+    if shownms:
         edgecolor = 'green'
-        linewidth = 2
+        linewidth = 1
+        headcolor = 'blue'
     else:
+        headcolor = 'purple'
         linewidth = 1
         edgecolor='r'
 
@@ -213,23 +221,30 @@ def vis_detections(im, class_name, dets, thresh=0.5, ax=None):
         key = dets[i, 5:]
         score = dets[i, 4]
         if score > thresh:
-            ax.add_patch(
-            Rectangle((bbox[0], bbox[1]),
-                        bbox[2] - bbox[0],
-                        bbox[3] - bbox[1], fill=False,
-                        edgecolor=edgecolor, linewidth=linewidth)
-            )
             if class_name == 'person':
                 savehuman=True
+                ax.add_patch(
+                Rectangle((bbox[0], bbox[1]),
+                            bbox[2] - bbox[0],
+                            bbox[3] - bbox[1], fill=False,
+                            edgecolor=edgecolor, linewidth=linewidth)
+                )
+                if not shownms:
+                    ax.add_patch(
+                    Rectangle((bbox[0]+1, bbox[1]+1),
+                                bbox[2] - bbox[0],
+                                bbox[3] - bbox[1], fill=False,
+                                edgecolor='yellow', linewidth=linewidth)
+                    )
                 ax.add_patch(
                 Rectangle((key[0], key[1]),
                             key[2] - key[0],
                             key[3] - key[1], fill=False,
-                            edgecolor='yellow', linewidth=linewidth)
+                            edgecolor=headcolor, linewidth=linewidth)
                 )
-            ax.text(bbox[0] + 3, bbox[1]+7,
-                    '{:s} {:.3f}'.format(class_name, score), color='green'# bbox=dict(facecolor='blue', alpha=0.5),
-            )
+            # ax.text(bbox[0] + 3, bbox[1]+7,
+            #         '{:s} {:.3f}'.format(class_name, score), color='green'# bbox=dict(facecolor='blue', alpha=0.5),
+            # )
     return savehuman
 
 def apply_nms(all_boxes, thresh):
@@ -256,6 +271,7 @@ def apply_nms(all_boxes, thresh):
 
 def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None, imdbname=''):
     """Test a Fast R-CNN network on an image database."""
+    shownms = 1
     if modelname is None:
         modelname = 'images'
     else:
@@ -271,8 +287,8 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
 
     if vis == True:
         savepath='output/im_'
-        # if shownms:
-        #     savepath+='nms_'
+        if shownms:
+            savepath+='nms_'
         savepath+=modelname+imdbname
         if not os.path.exists(savepath):
             os.mkdir(savepath)
@@ -316,16 +332,17 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
             if vis:
                 for gt_box in gt_boxes:
                     print gt_box
-                    ax.add_patch(
-                        Rectangle((gt_box[0], gt_box[1]),
-                                gt_box[2] - gt_box[0],
-                                gt_box[3] - gt_box[1], fill=False, linewidth=1)
-                    )
-                    # ax.add_patch(
-                    #         Rectangle((gt_box[0+5], gt_box[1+5]),
-                    #                 gt_box[2+5] - gt_box[0+5],
-                    #                 gt_box[3+5] - gt_box[1+5], fill=False, linewidth=1)
-                    #     )
+                    if gt_box[-1] == '15':
+                        ax.add_patch(
+                            Rectangle((gt_box[0], gt_box[1]),
+                                    gt_box[2] - gt_box[0],
+                                    gt_box[3] - gt_box[1], fill=False, edgecolor='blue', linewidth=1)
+                        )
+                        # ax.add_patch(
+                        #         Rectangle((gt_box[0+5], gt_box[1+5]),
+                        #                 gt_box[2+5] - gt_box[0+5],
+                        #                 gt_box[3+5] - gt_box[1+5], fill=False, linewidth=1)
+                        #     )
                 
                 
         else:
@@ -355,13 +372,20 @@ def test_net(net, imdb, max_per_image=100, thresh=0.3, vis=False, modelname=None
             cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
                 .astype(np.float32, copy=False)
             keep = nms(cls_dets, cfg.TEST.NMS)
+            if shownms:
+                nms_dets = mask_arr(cls_dets, keep)
             cls_dets = cls_dets[keep, :]
             if haskeys:
                 cls_keys = keys[inds, j*4:(j+1)*4]
                 cls_dets = np.hstack((cls_dets, cls_keys[keep, :])) \
                     .astype(np.float32, copy=False)
+                if shownms:
+                    nms_dets = np.hstack((nms_dets, mask_arr(cls_keys, keep))) \
+                        .astype(np.float32, copy=False)
+                
             if vis:
                 if vis_detections(im, imdb.classes[j], cls_dets, ax=ax):
+                    vis_detections(im, imdb.classes[j], nms_dets, ax=ax, shownms=1)
                     savehuman = True
             all_boxes[j][i] = cls_dets[:, :5]
             # all_boxes[j][i] = cls_dets
