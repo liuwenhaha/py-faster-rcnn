@@ -1,3 +1,5 @@
+*.swo
+*.swp
 core
 *.DS_Store
 output/

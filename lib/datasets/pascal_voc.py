@@ -270,37 +270,45 @@ class pascal_voc(imdb):
             'Main',
             self._image_set + '.txt')
         cachedir = os.path.join(self._devkit_path, 'annotations_cache')
-        aps = []
         # The PASCAL VOC metric changed in 2010
         use_07_metric = True if int(self._year) < 2010 else False
         print 'VOC07 metric? ' + ('Yes' if use_07_metric else 'No')
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
-        for i, cls in enumerate(self._classes):
-            if cls == '__background__':
-                continue
-            filename = self._get_voc_results_file_template().format(cls)
-            rec, prec, ap = voc_eval(
-                filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
-                use_07_metric=use_07_metric)
-            aps += [ap]
-            print('AP for {} = {:.4f}'.format(cls, ap))
-            with open(os.path.join(output_dir, cls + '_pr.pkl'), 'w') as f:
-                cPickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
-        print('Mean AP = {:.4f}'.format(np.mean(aps)))
-        print('~~~~~~~~')
-        print('Results:')
-        for ap in aps:
-            print('{:.3f}'.format(ap))
-        print('{:.3f}'.format(np.mean(aps)))
-        print('~~~~~~~~')
-        print('')
-        print('--------------------------------------------------------------')
-        print('Results computed with the **unofficial** Python eval code.')
-        print('Results should be very close to the official MATLAB eval code.')
-        print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
-        print('-- Thanks, The Management')
-        print('--------------------------------------------------------------')
+        ious =  np.linspace(.5, 0.95, np.round((0.95-.5)/.05)+1, endpoint=True)
+        apss = []
+        for ov in ious:
+            aps = []
+            for i, cls in enumerate(self._classes):
+                if cls == '__background__':
+                    continue
+                filename = self._get_voc_results_file_template().format(cls)
+                rec, prec, ap = voc_eval(
+                    filename, annopath, imagesetfile, cls, cachedir, ovthresh=ov,
+                    use_07_metric=use_07_metric)
+                aps += [ap]
+                print('AP for {} = {:.4f}'.format(cls, ap))
+                with open(os.path.join(output_dir, cls + '_pr.pkl'), 'w') as f:
+                    cPickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+            apss.append(aps)
+        print('mmAP {:.4f}'.format(np.mean(apss)))
+        print('mAP@.5 {:.4f}'.format(np.mean(apss[0])))
+        print('mAP@.70 {:.4f}'.format(np.mean(apss[np.where(ious==.70)[0][0]])))
+        print('mAP@.75 {:.4f}'.format(np.mean(apss[np.where(ious==.75)[0][0]])))
+        #print('Mean AP = {:.4f}'.format(np.mean(aps)))
+        #print('~~~~~~~~')
+        #print('Results:')
+        #for ap in aps:
+        #    print('{:.3f}'.format(ap))
+        #print('{:.3f}'.format(np.mean(aps)))
+        #print('~~~~~~~~')
+        #print('')
+        #print('--------------------------------------------------------------')
+        #print('Results computed with the **unofficial** Python eval code.')
+        #print('Results should be very close to the official MATLAB eval code.')
+        #print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
+        #print('-- Thanks, The Management')
+        #print('--------------------------------------------------------------')
 
     def _do_matlab_eval(self, output_dir='output'):
         print '-----------------------------------------------------'
