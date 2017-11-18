@@ -1,3 +1,7 @@
+### features
+- AP@[0.05, 0.95]
+- VGGx2, x4
+
 ### Disclaimer
 
 The official Faster R-CNN code (written in MATLAB) is available [here](https://github.com/ShaoqingRen/faster_rcnn).
