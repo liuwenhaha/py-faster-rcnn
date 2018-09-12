@@ -1,6 +1,7 @@
 ### features
 - AP@[0.05, 0.95]
 - VGGx2, x4
+- Soft-NMS
 
 ### Disclaimer
 
